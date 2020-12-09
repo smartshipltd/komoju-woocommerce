@@ -23,7 +23,7 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
     public $locale;
 
     /** @var boolean Whether or not logging is enabled */
-    public static $log_enabled = false;
+    public static $log_enabled = true;
 
     /** @var WC_Logger Logger instance */
     public static $log = false;
@@ -42,6 +42,7 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
         $this->accountID     		= $this->get_option( 'accountID' );
         $this->secretKey     		= $this->get_option( 'secretKey' );
         $this->webhookSecretToken   = $this->get_option( 'webhookSecretToken' );
+        $this->komoju_api = new KomojuApi( $this->secretKey );
         self::$log_enabled    		= $this->debug;
         // Load the settings.
         $this->init_form_fields();
@@ -113,15 +114,30 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
     public function process_payment( $order_id ) {
         include_once( 'includes/class-wc-gateway-komoju-request.php' );
         $order          = wc_get_order( $order_id );
-        $komoju_request = new WC_Gateway_Komoju_Request( $this );
-        $payment_method = sanitize_text_field($_POST['komoju-method']);
+        $default_locale = $this->get_locale_or_fallback();
+        $payment_method = array(sanitize_text_field($_POST['komoju-method']));
+        $return_url = $this->get_mydefault_api_url();
+
+        // new session
+        $komoju_api = $this->komoju_api;
+        $komoju_request = $komoju_api->createSession([
+          'return_url'  => $return_url,
+          'default_locale' => $this->get_locale_or_fallback(),
+          'payment_types' => $payment_method,
+          'payment_data' => [
+            'amount' => $order->get_total(),
+            'currency' => get_woocommerce_currency(),
+            'external_order_num' => strval( $order_id )
+          ],
+        ]);
+
+        // $komoju_request = new WC_Gateway_Komoju_Request( $this );
 
         return array(
           'result'   => 'success',
-          'redirect' => $komoju_request->get_request_url( $order, $payment_method )
+          'redirect' => $komoju_request->session_url
         );
     }
-
 
     /**
      * Payment form on checkout page
@@ -164,7 +180,8 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
     }
 
     private function get_input_field_data() {
-        $komoju_client = new KomojuApi( $this->secretKey );
+        $komoju_client = $this->komoju_api;
+        var_dump( $this->get_mydefault_api_url() );
 
         try {
             $methods = $komoju_client->paymentMethods();
