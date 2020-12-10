@@ -23,10 +23,10 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
     public $locale;
 
     /** @var boolean Whether or not logging is enabled */
-    public static $log_enabled = true;
+    public static $log_enabled;
 
     /** @var WC_Logger Logger instance */
-    public static $log = false;
+    public static $log;
 
     /**
      * Constructor for the gateway.
@@ -59,7 +59,7 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
             WC_Gateway_Komoju::log( 'is not valid for use. No IPN set.' );
         } else {
             include_once( 'includes/class-wc-gateway-komoju-ipn-handler.php' );
-            new WC_Gateway_Komoju_IPN_Handler( $this->webhookSecretToken, $this->secretKey, $this->invoice_prefix );
+            new WC_Gateway_Komoju_IPN_Handler( $this, $this->webhookSecretToken, $this->secretKey, $this->invoice_prefix );
         }
     }
 
@@ -127,7 +127,7 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
           'payment_data' => [
             'amount' => $order->get_total(),
             'currency' => get_woocommerce_currency(),
-            'external_order_num' => strval( $order_id )
+            'external_order_num' => $this->external_order_num( $order )
           ],
         ]);
 
@@ -144,6 +144,15 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
      */
     public function payment_fields() {
         $this->komoju_method_form();
+    }
+
+    /**
+     * set KOMOJU side reference for order
+     * @param WC_Order $order
+     */
+    private function external_order_num( $order ) {
+      $suffix = substr(str_shuffle("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"), 0, 6);
+      return ($this->get_option('invoice_prefix') . $order->get_order_number() . '-' . $suffix);
     }
 
     /**
@@ -181,7 +190,6 @@ class WC_Gateway_Komoju extends WC_Payment_Gateway {
 
     private function get_input_field_data() {
         $komoju_client = $this->komoju_api;
-        var_dump( $this->get_mydefault_api_url() );
 
         try {
             $methods = $komoju_client->paymentMethods();
