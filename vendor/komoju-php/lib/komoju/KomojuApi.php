@@ -6,7 +6,7 @@ class KomojuApi
     {
         $this->endpoint = 'https://komoju.com';
         $this->via = 'woocommerce';
-        $this->secretKey = 'degica-mart';
+        $this->secretKey = $secretKey;
     }
 
     public function setEndpoint($endpoint)
